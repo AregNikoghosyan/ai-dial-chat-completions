@@ -23,16 +23,15 @@ class DialClient(BaseClient):
 
     def get_completion(self, messages: list[Message]) -> Message:
         response = self.client.chat.completions.create(
-    deployment_name=self._deployment_name,
-    messages=[m.to_dict() for m in messages],
-
+            deployment_name=self._deployment_name,
+            messages=[m.to_dict() for m in messages],
         )
 
         if not response.choices:
             raise Exception("No choices in response found")
 
         content = response.choices[0].message.content
-        print(content)
+        print(f"AI: {content}")
 
         return Message(
             role=Role.AI,
@@ -40,13 +39,13 @@ class DialClient(BaseClient):
         )
 
     async def stream_completion(self, messages: list[Message]) -> Message:
-        
-        chunks = await self.async_client.chat.completions.create(
-    deployment_name=self._deployment_name,
-    messages=[m.to_dict() for m in messages],
-    stream=True,
-)
+        print("AI: ", end="")
 
+        chunks = await self.async_client.chat.completions.create(
+            deployment_name=self._deployment_name,
+            messages=[m.to_dict() for m in messages],
+            stream=True,
+        )
 
         contents: list[str] = []
 

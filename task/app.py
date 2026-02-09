@@ -1,7 +1,6 @@
 import asyncio
 
 from task.clients.client import DialClient
-from task.clients.custom_client import CustomDialClient
 from task.constants import DEFAULT_SYSTEM_PROMPT
 from task.models.conversation import Conversation
 from task.models.message import Message
@@ -9,26 +8,32 @@ from task.models.role import Role
 
 
 async def start(stream: bool) -> None:
-    deployment_name = "gpt-4o-mini-2024-07-18"
-    dial_client = DialClient(deployment_name)
+    # System prompt
+    system_prompt = input(
+        "Provide System prompt or press 'enter' to continue.\n> "
+    ).strip()
 
-    custom_client = CustomDialClient(deployment_name)
-
-    conversation = Conversation()
-
-    system_prompt = input("System prompt (press Enter for default): ").strip()
     if not system_prompt:
         system_prompt = DEFAULT_SYSTEM_PROMPT
 
+    conversation = Conversation()
     conversation.add_message(
         Message(role=Role.SYSTEM, content=system_prompt)
     )
 
+    print("\nType your question or 'exit' to quit.")
+
+    client = DialClient(deployment_name="gpt-4o-mini-2024-07-18")
+
     while True:
-        user_input = input("You: ").strip()
+        try:
+            user_input = input("> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nExiting the chat. Goodbye!")
+            break
 
         if user_input.lower() == "exit":
-            print("Bye 👋")
+            print("Exiting the chat. Goodbye!")
             break
 
         conversation.add_message(
@@ -36,17 +41,11 @@ async def start(stream: bool) -> None:
         )
 
         if stream:
-            response = await dial_client.stream_completion(conversation.messages)
+            response = await client.stream_completion(conversation.messages)
         else:
-            response = dial_client.get_completion(conversation.messages)
+            response = client.get_completion(conversation.messages)
 
         conversation.add_message(response)
 
-        print("\n--- Custom client response ---")
-        if stream:
-            await custom_client.stream_completion(conversation.messages)
-        else:
-            custom_client.get_completion(conversation.messages)
 
-
-asyncio.run(start(True))
+asyncio.run(start(stream=True))

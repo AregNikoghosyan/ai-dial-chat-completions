@@ -9,12 +9,13 @@ from task.models.role import Role
 
 
 class CustomDialClient(BaseClient):
-    _endpoint: str
-    _api_key: str
 
     def __init__(self, deployment_name: str):
         super().__init__(deployment_name)
-        self._endpoint = DIAL_ENDPOINT + f"/openai/deployments/{deployment_name}/chat/completions"
+        self._endpoint = (
+            f"{DIAL_ENDPOINT}/openai/deployments/"
+            f"{deployment_name}/chat/completions"
+        )
 
     def get_completion(self, messages: list[Message]) -> Message:
         headers = {
@@ -22,14 +23,14 @@ class CustomDialClient(BaseClient):
             "Content-Type": "application/json",
         }
 
-        request_data = {
-            "messages": [msg.to_dict() for msg in messages]
+        payload = {
+            "messages": [m.to_dict() for m in messages]
         }
 
         response = requests.post(
             self._endpoint,
             headers=headers,
-            json=request_data,
+            json=payload,
         )
 
         if response.status_code != 200:
@@ -41,7 +42,7 @@ class CustomDialClient(BaseClient):
             raise Exception("No choices in response found")
 
         content = data["choices"][0]["message"]["content"]
-        print(content)
+        print(f"AI: {content}")
 
         return Message(
             role=Role.AI,
@@ -54,9 +55,9 @@ class CustomDialClient(BaseClient):
             "Content-Type": "application/json",
         }
 
-        request_data = {
+        payload = {
             "stream": True,
-            "messages": [msg.to_dict() for msg in messages],
+            "messages": [m.to_dict() for m in messages],
         }
 
         contents: list[str] = []
@@ -65,24 +66,23 @@ class CustomDialClient(BaseClient):
             async with session.post(
                 self._endpoint,
                 headers=headers,
-                json=request_data,
+                json=payload,
             ) as response:
 
                 if response.status != 200:
                     text = await response.text()
                     raise Exception(f"HTTP {response.status}: {text}")
 
-                async for raw_line in response.content:
-                    line = raw_line.decode("utf-8").strip()
+                print("AI: ", end="")
 
-                    if not line:
+                async for raw in response.content:
+                    line = raw.decode("utf-8").strip()
+
+                    if not line or line == "data: [DONE]":
                         continue
 
-                    if line == "data: [DONE]":
-                        break
-
                     if line.startswith("data: "):
-                        payload = json.loads(line.replace("data: ", ""))
+                        payload = json.loads(line[6:])
                         delta = payload["choices"][0]["delta"]
 
                         if "content" in delta:
